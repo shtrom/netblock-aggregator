@@ -10,8 +10,14 @@ cache = {}
 
 if cache_file.exists():
     with open(cache_file) as f:
-        for row in csv.reader(f):
-            cache[row[0]] = row[1]
+        reader = csv.DictReader(f)
+        for row in reader:
+            cache[row['cidr']] = row['netname']
+else:
+    # Create cache file with header
+    with open(cache_file, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['cidr', 'netname'])
+        writer.writeheader()
 
 def get_netname(ip):
     ip_obj = ipaddress.ip_address(ip)
@@ -24,12 +30,17 @@ def get_netname(ip):
     netname = result.get('network', {}).get('name') or result.get('asn_description')
     cache[cidr] = netname
     with open(cache_file, 'a', newline='') as f:
-        csv.writer(f).writerow([cidr, netname])
+        writer = csv.DictWriter(f, fieldnames=['cidr', 'netname'])
+        writer.writerow({'cidr': cidr, 'netname': netname})
         f.flush()
     return netname
 
 input_file = open(sys.argv[1]) if len(sys.argv) > 1 else sys.stdin
 
+output_writer = csv.DictWriter(sys.stdout, fieldnames=['ip', 'netname'])
+output_writer.writeheader()
+
 for line in input_file:
     ip = line.strip()
-    print(f"{ip}\t{get_netname(ip)}")
+    netname = get_netname(ip)
+    output_writer.writerow({'ip': ip, 'netname': netname})
