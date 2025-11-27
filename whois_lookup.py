@@ -28,12 +28,25 @@ def get_netname(ip):
     result = IPWhois(ip).lookup_rdap()
     cidr = result.get('network', {}).get('cidr') or result.get('asn_cidr')
     netname = result.get('network', {}).get('name') or result.get('asn_description')
-    cache[cidr] = netname
+
+    # Handle multiple CIDR blocks separated by commas
+    cidr_blocks = [block.strip() for block in cidr.split(',')]
+
+    # Add each block to the cache
     with open(cache_file, 'a', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=['cidr', 'netname'])
-        writer.writerow({'cidr': cidr, 'netname': netname})
+        for block in cidr_blocks:
+            cache[block] = netname
+            writer.writerow({'cidr': block, 'netname': netname})
         f.flush()
-    return cidr, netname
+
+    # Find and return the specific block that contains this IP
+    for block in cidr_blocks:
+        if ip_obj in ipaddress.ip_network(block):
+            return block, netname
+
+    # Fallback: return first block if none match (shouldn't happen)
+    return cidr_blocks[0], netname
 
 input_file = open(sys.argv[1]) if len(sys.argv) > 1 else sys.stdin
 
